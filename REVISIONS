@@ -1,0 +1,73 @@
+------------------------------------------------------------------------
+
+Version 0.5b5  2012-09-06 [+344 changesets]
+
+  This is the first release in 10 months, and includes too many
+  changes to summarize.  Much of the effort has been in implementing
+  checkpoint / restart in a way that would work for both MPI and
+  Charm++; however, this was abandoned in favor of using Charm++'s
+  built-in support for checkpoint / restart, which required writing
+  about 76 "packing" functions.  This effectively makes Cello a
+  Charm++-only code rather than Charm++ and MPI, though MPI code is
+  still present.  Restart capability is still being debugged, but will
+  be available ASAP.  Innumerable other additions, bug fixes, and
+  changes have been made, including restructuring the file layout to
+  src/Cello and src/Enzo subdirectories.
+
+------------------------------------------------------------------------
+
+Version 0.5b4  2011-12-08 [+54 changesets]
+
+  This update fixes a lot of errors that became apparent when testing
+  on Intel and PGI compilers in addition to GNU.
+
+  * FIX:     Fixed Cello-to-HDF5 axis-reversal OutputData bug
+  * FIX:     Fixed function call sequence so that ghosts are refreshed
+             before boundary conditions are enforced
+  * FIX:     Added barrier after enforcing initial conditions to prevent
+             error due to CHARM++ race conditions
+  * Fix:     Fixed Intel serial link bug
+  * Fix:     Fixed colormap bug
+  * Change:  Initialize field data with -MAX(float)
+  * Change:  Replaced 1e-20 with 1e-10 for single precision to avoid 
+             underflow in PPML_monot.F
+  * Change:  Added support for communicating edge and vertex ghosts as well 
+             as faces
+  * Change:  Added Field:refresh_edges and Field:refresh_corners parameters
+  * Change:  Changed temp_update_all to true and temp_update_full to false in
+             all input files
+  * Change:  Moved PPML temporary array allocation from Fortran stack to 
+             C++ heap to avoid stack overflow in PPML_MAIN.F
+
+------------------------------------------------------------------------
+
+Version 0.5b3  2011-10-28 [+15 changesets]
+
+  * NEW:     FINISHED PPML MHD
+  * New:     added TimestepPpml
+  * New:     added PPML tests to input/method_ppml*
+  * New:     timestep : type = [ "ppml" | "default" ]
+  * New:     added TimestepPpml class
+  * New:     updated EnzoNamespace field initialization for PPML
+  * Change:  added CELLO_TYPE check to compile.sh 
+  * Change:  modified HelloWorld.in to match documentation
+  * Change:  changed PPML_Timestep.F to use scalar dx,dy,dz rather than arrays
+  * Fix:     re-added Parallel parameters to ppm.incl
+  * Fix:     bug fixes in compile.sh
+
+------------------------------------------------------------------------
+
+Version 0.5b2  2011-10-27 [+18 changesets]
+
+  * New:     added REVISIONS
+  * Change:  modified support Triton GNU, Intel, and PGI compilers
+  * Change:  removed enzo.h
+  * Fix:     changed HelloWorld.in to avoid buggy pngwriter PNG image masks
+
+------------------------------------------------------------------------
+
+Version 0.5b1  2011-10-26
+
+  * Initial unigrid beta release
+
+

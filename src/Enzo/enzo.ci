@@ -1,0 +1,305 @@
+// See LICENSE_CELLO file for license and copyright information
+
+/// @file     enzo.ci
+/// @author   James Bordner (jobordner@ucsd.edu)
+/// @date     2011-03-24
+/// @brief    CHARM++ Enzo process group
+
+module enzo {
+
+  initnode void register_method_turbulence(void);
+
+  readonly EnzoConfig g_enzo_config;
+  readonly int EnzoBlock::UseMinimumPressureSupport[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::MinimumPressureSupportParameter[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::ComovingBoxSize[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::HubbleConstantNow[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::OmegaMatterNow[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::OmegaLambdaNow[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::MaxExpansionRate[CONFIG_NODE_SIZE];
+  readonly int EnzoBlock::MultiSpecies[CONFIG_NODE_SIZE];
+  readonly int EnzoBlock::PressureFree[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::Gamma[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::GravitationalConstant[CONFIG_NODE_SIZE];
+  readonly int EnzoBlock::ProblemType[CONFIG_NODE_SIZE];
+  readonly int EnzoBlock::PPMFlatteningParameter[CONFIG_NODE_SIZE];
+  readonly int EnzoBlock::PPMDiffusionParameter[CONFIG_NODE_SIZE];
+  readonly int EnzoBlock::PPMSteepeningParameter[CONFIG_NODE_SIZE];
+  readonly int EnzoBlock::DualEnergyFormalism[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::DualEnergyFormalismEta1[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::DualEnergyFormalismEta2[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::pressure_floor[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::density_floor[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::number_density_floor[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::temperature_floor[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::InitialRedshift[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::InitialTimeInCodeUnits[CONFIG_NODE_SIZE];
+  readonly enzo_float EnzoBlock::DomainLeftEdge [CONFIG_NODE_SIZE_3];
+  readonly enzo_float EnzoBlock::DomainRightEdge[CONFIG_NODE_SIZE_3];
+  readonly int EnzoBlock::GridRank[CONFIG_NODE_SIZE];
+  readonly int EnzoBlock::ghost_depth[CONFIG_NODE_SIZE_3];
+  readonly int EnzoBlock::NumberOfBaryonFields[CONFIG_NODE_SIZE];      // active baryon fields
+
+  //==================================================
+  // WARNING: Enable the following two lines iff use_grackle = 1
+  // in top-level SConstruct file
+  // ==================================================
+
+#ifdef CONFIG_USE_GRACKLE
+  //PUPable EnzoInitialGrackleTest;
+  PUPable EnzoMethodGrackle;
+#endif
+
+  PUPable EnzoBoundary;
+  PUPable EnzoConfig;
+  PUPable EnzoFactory;
+
+  PUPable EnzoInitialImplosion2;
+  PUPable EnzoInitialPm;
+  PUPable EnzoInitialSedovArray2;
+  PUPable EnzoInitialSedovArray3;
+  PUPable EnzoInitialSedovRandom;
+  PUPable EnzoInitialSoup;  	  
+  PUPable EnzoInitialTurbulence;
+
+  PUPable EnzoRefineShock;
+
+  PUPable EnzoComputePressure;
+  PUPable EnzoComputeTemperature;
+  PUPable EnzoComputeAcceleration;
+  PUPable EnzoComputeCicInterp;
+
+  PUPable EnzoMatrixLaplace;
+  PUPable EnzoMatrixDiagonal;
+  PUPable EnzoMatrixIdentity;
+
+  PUPable EnzoMethodHeat;
+  PUPable EnzoMethodNull;
+  PUPable EnzoMethodPpm;
+  PUPable EnzoMethodPpml;
+  PUPable EnzoMethodPmDeposit;
+  PUPable EnzoMethodPmUpdate;
+  PUPable EnzoMethodTurbulence;
+  PUPable EnzoMethodGravity;
+
+  PUPable EnzoProblem;
+  PUPable EnzoProlong;
+  PUPable EnzoProlongMC1;
+  PUPable EnzoProlongPoisson;
+
+  PUPable EnzoRestrict;
+
+  PUPable EnzoSolverCg;
+  PUPable EnzoSolverDiagonal;
+  PUPable EnzoSolverBiCgStab;
+  PUPable EnzoSolverMg0;
+  PUPable EnzoSolverHg;
+  PUPable EnzoSolverJacobi;
+
+  extern module mesh;
+
+  readonly CProxy_EnzoSimulation proxy_enzo_simulation;
+
+  group [migratable] EnzoSimulation : Simulation {
+
+    entry EnzoSimulation (const char filename[n], int n);
+
+    entry void r_startup_begun (CkReductionMsg *);
+    entry void r_write_checkpoint ();
+  }
+
+  array[Index] EnzoBlock : Block {
+
+    entry EnzoBlock (MsgRefine * mesg);
+
+    entry EnzoBlock();
+
+    // EnzoMethodTurbulence synchronization entry methods
+    entry void p_method_turbulence_end(CkReductionMsg *msg);
+
+    // EnzoMethodGravity synchronization entry methods
+    entry void r_method_gravity_continue(CkReductionMsg * msg);
+    entry void r_method_gravity_end(CkReductionMsg * msg);
+
+    // EnzoSolverCg synchronization entry methods
+
+    entry void r_solver_cg_matvec(CkReductionMsg *);
+
+    template <class T>
+    entry void r_solver_cg_loop_0a(CkReductionMsg *msg);
+    template <class T>
+    entry void r_solver_cg_loop_0b(CkReductionMsg *msg);
+    template <class T>
+    entry void r_solver_cg_shift_1(CkReductionMsg *msg);
+    template <class T>
+    entry void p_solver_cg_loop_2(CkReductionMsg *msg);
+    template <class T>
+    entry void r_solver_cg_loop_3(CkReductionMsg *msg);
+    template <class T>
+    entry void r_solver_cg_loop_5(CkReductionMsg *msg);
+
+    // EnzoSolverBiCGStab post-reduction entry methods
+
+    template <class T>
+    entry void r_solver_bicgstab_start_1(CkReductionMsg *msg);
+    template <class T>
+    entry void r_solver_bicgstab_start_3(CkReductionMsg *msg);
+    template <class T>
+    entry void r_solver_bicgstab_loop_5(CkReductionMsg *msg);
+    template <class T>
+    entry void r_solver_bicgstab_loop_11(CkReductionMsg *msg);
+    template <class T>
+    entry void r_solver_bicgstab_loop_13(CkReductionMsg *msg);
+    template <class T>
+    entry void r_solver_bicgstab_loop_15(CkReductionMsg *msg);
+
+    entry void p_solver_bicgstab_loop_1();
+    entry void p_solver_bicgstab_loop_2();
+    entry void p_solver_bicgstab_loop_3();
+    entry void p_solver_bicgstab_loop_7();
+    entry void p_solver_bicgstab_loop_8();
+    entry void p_solver_bicgstab_loop_9();
+    entry void p_solver_bicgstab_acc();
+    entry void p_solver_bicgstab_exit();
+
+    // EnzoSolverJacobi
+
+    entry void p_solver_jacobi_continue();
+
+    // EnzoSolverMg0
+    
+    template <class T>  entry void p_solver_mg0_shift_b(CkReductionMsg *msg);
+    
+    entry void p_solver_mg0_pre_smooth();
+    entry void p_solver_mg0_solve_coarse();
+    entry void p_solver_mg0_post_smooth();
+//    template <class T> entry void p_solver_mg0_restrict_send(CkReductionMsg *msg);
+    template <class T> entry void p_solver_mg0_restrict_recv(FieldMsg * msg);
+    template <class T> entry void p_solver_mg0_prolong_recv(FieldMsg * msg);
+//    template <class T> entry void p_solver_mg0_end_cycle(CkReductionMsg *msg);
+
+    // EnzoSolverHg
+    
+    template <class T>  entry void p_solver_hg_shift_b(CkReductionMsg *msg);
+    
+    entry void p_solver_hg_pre_smooth();
+    entry void p_solver_hg_solve_coarse();
+    template <class T> entry void p_solver_hg_restrict_send(CkReductionMsg *msg);
+    template <class T> entry void p_solver_hg_restrict_recv(FieldMsg * msg);
+    template <class T> entry void p_solver_hg_prolong_recv(FieldMsg * msg);
+    template <class T> entry void p_solver_hg_post_smooth(CkReductionMsg *msg);
+    template <class T> entry void p_solver_hg_end_cycle(CkReductionMsg *msg);
+
+  };
+
+};
+
+module template_defs {
+  
+   extern module enzo;
+
+   // EnzoSolverCg
+   
+   extern entry void EnzoBlock r_solver_cg_loop_0a<float>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_cg_loop_0a<double>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_cg_loop_0a<long double>(CkReductionMsg *);
+
+   extern entry void EnzoBlock r_solver_cg_loop_0b<float>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_cg_loop_0b<double>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_cg_loop_0b<long double>(CkReductionMsg *);
+
+   extern entry void EnzoBlock r_solver_cg_loop_3<float>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_cg_loop_3<double>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_cg_loop_3<long double>(CkReductionMsg *);
+
+   extern entry void EnzoBlock r_solver_cg_loop_5<float>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_cg_loop_5<double>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_cg_loop_5<long double>(CkReductionMsg *);
+
+   // EnzoSolverBiCgStab
+   
+   extern entry void EnzoBlock r_solver_bicgstab_start_1<float>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_start_1<double>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_start_1<long double>(CkReductionMsg *);
+
+   extern entry void EnzoBlock r_solver_bicgstab_start_3<float>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_start_3<double>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_start_3<long double>(CkReductionMsg *);
+
+   extern entry void EnzoBlock r_solver_bicgstab_loop_1<float>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_loop_1<double>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_loop_1<long double>(CkReductionMsg *);
+
+   extern entry void EnzoBlock r_solver_bicgstab_loop_3<float>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_loop_3<double>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_loop_3<long double>(CkReductionMsg *);
+
+   extern entry void EnzoBlock r_solver_bicgstab_loop_5<float>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_loop_5<double>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_loop_5<long double>(CkReductionMsg *);
+
+   extern entry void EnzoBlock r_solver_bicgstab_loop_7<float>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_loop_7<double>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_loop_7<long double>(CkReductionMsg *);
+
+   extern entry void EnzoBlock r_solver_bicgstab_loop_11<float>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_loop_11<double>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_loop_11<long double>(CkReductionMsg *);
+
+   extern entry void EnzoBlock r_solver_bicgstab_loop_13<float>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_loop_13<double>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_loop_13<long double>(CkReductionMsg *);
+
+   extern entry void EnzoBlock r_solver_bicgstab_loop_15<float>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_loop_15<double>(CkReductionMsg *);
+   extern entry void EnzoBlock r_solver_bicgstab_loop_15<long double>(CkReductionMsg *);
+
+   extern entry void EnzoBlock p_solver_bicgstab_acc<float>();
+   extern entry void EnzoBlock p_solver_bicgstab_acc<double>();
+   extern entry void EnzoBlock p_solver_bicgstab_acc<long double>();
+
+   extern entry void EnzoBlock p_solver_bicgstab_exit<float>();
+   extern entry void EnzoBlock p_solver_bicgstab_exit<double>();
+   extern entry void EnzoBlock p_solver_bicgstab_exit<long double>();
+
+   // EnzoSolverMg0
+   
+   extern entry void EnzoBlock p_solver_mg0_shift_b<float>();
+   extern entry void EnzoBlock p_solver_mg0_shift_b<double>();
+   extern entry void EnzoBlock p_solver_mg0_shift_b<long double>();
+
+//   extern entry void EnzoBlock p_solver_mg0_restrict_send<float>();
+//   extern entry void EnzoBlock p_solver_mg0_restrict_send<double>();
+//   extern entry void EnzoBlock p_solver_mg0_restrict_send<long double>();
+
+   extern entry void EnzoBlock p_solver_mg0_restrict_recv<float>();
+   extern entry void EnzoBlock p_solver_mg0_restrict_recv<double>();
+   extern entry void EnzoBlock p_solver_mg0_restrict_recv<long double>();
+
+   extern entry void EnzoBlock p_solver_mg0_prolong_recv<float>();
+   extern entry void EnzoBlock p_solver_mg0_prolong_recv<double>();
+   extern entry void EnzoBlock p_solver_mg0_prolong_recv<long double>();
+
+   // EnzoSolverHg
+   
+   extern entry void EnzoBlock p_solver_hg_shift_b<float>();
+   extern entry void EnzoBlock p_solver_hg_shift_b<double>();
+   extern entry void EnzoBlock p_solver_hg_shift_b<long double>();
+
+   extern entry void EnzoBlock p_solver_hg_restrict_send<float>();
+   extern entry void EnzoBlock p_solver_hg_restrict_send<double>();
+   extern entry void EnzoBlock p_solver_hg_restrict_send<long double>();
+
+   extern entry void EnzoBlock p_solver_hg_restrict_recv<float>();
+   extern entry void EnzoBlock p_solver_hg_restrict_recv<double>();
+   extern entry void EnzoBlock p_solver_hg_restrict_recv<long double>();
+
+   extern entry void EnzoBlock p_solver_hg_prolong_recv<float>();
+   extern entry void EnzoBlock p_solver_hg_prolong_recv<double>();
+   extern entry void EnzoBlock p_solver_hg_prolong_recv<long double>();
+
+   extern entry void EnzoBlock p_solver_hg_post_smooth<float>();
+   extern entry void EnzoBlock p_solver_hg_post_smooth<double>();
+   extern entry void EnzoBlock p_solver_hg_post_smooth<long double>();
+
+};

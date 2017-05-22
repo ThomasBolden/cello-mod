@@ -1,0 +1,133 @@
+ Boundary {
+     type = "reflecting";
+ }
+
+ Domain {
+     lower = [ 0.0, 0.0 ];
+     upper = [ 1.0, 1.0 ];
+ }
+
+ Field {
+     alignment = 8;
+     gamma = 1.400;
+     ghost_depth = 3;
+     list = [ "density", 
+              "internal_energy",
+              "total_energy",
+              "velocity_x",
+              "velocity_y",
+              "velocity_z",
+              "HI_density",
+              "HII_density",
+              "HM_density",
+              "HeI_density",
+              "HeII_density",
+              "HeIII_density",
+              "H2I_density",
+              "H2II_density",
+              "DI_density",
+              "DII_density",
+              "HDI_density",
+              "e_density",
+              "metal_density",
+              "cooling_time",
+              "temperature",
+              "pressure",
+              "gamma"
+     ];
+
+     padding = 0;
+ }
+
+ Group {
+   list = ["colour"];
+    colour {
+       field_list = [
+              "HI_density",
+              "HII_density",
+              "HM_density",
+              "HeI_density",
+              "HeII_density",
+              "HeIII_density",
+              "H2I_density",
+              "H2II_density",
+              "DI_density",
+              "DII_density",
+              "HDI_density",
+              "e_density",
+              "metal_density",
+              "cooling_time",
+              "temperature",
+              "pressure",
+              "gamma" ];
+    }
+ }
+
+ Initial {
+   list = ["grackle_test"];
+ }
+
+ Mesh {
+     root_blocks = [ 2, 4 ];
+     root_rank = 2;
+     root_size = [ 400, 400 ];
+ }
+
+ Method {
+      list = [ "grackle","ppm" ];
+#     list = [ "ppm" ];
+
+     grackle {
+        courant = 0.80;
+        data_file = "input/CloudyData_UVB=HM2012.h5";
+     }
+
+     ppm {
+        courant = 0.80;
+        diffusion   = true;
+        flattening  = 3;
+        steepening  = true;
+        dual_energy = true;
+     }
+ }
+
+ Output {
+     list = [ "density", "check"];
+
+     check {
+        type  = "checkpoint";
+        dir   = ["method_grackle-1-%06d","cycle"];
+        schedule { var = "cycle"; start = 1000; step = 1000; }
+     }
+
+
+     data {
+         field_list = [ "density" ];
+         name = [ "method_grackle-1-%02d-%06d.h5", "proc", "cycle" ];
+         schedule {
+             var = "time";
+             step = 0.1;
+         }
+         type = "data";
+     }
+     density {
+         colormap = [ 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0 ];
+         field_list = [
+            "density"
+          ];
+         name = [ "method_grackle-1-%06d.png", "cycle" ];
+         schedule {
+             var = "time";
+             step = 0.1;
+         }
+         type = "image";
+     }
+ }
+
+ Stopping {
+    time = 2.5;
+ }
+
+ Testing {
+     time_final = 2.5;
+ }

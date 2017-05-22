@@ -1,0 +1,42 @@
+// See LICENSE_CELLO file for license and copyright information
+
+#ifndef PARALLEL_DEF
+#define PARALLEL_DEF
+
+/// @file     parallel.def
+/// @author   James Bordner (jobordner@ucsd.edu)
+/// @date     Mon Aug 13 2010
+/// @todo     Use Parallel class functions instead of preprocessor macros
+/// @brief    Macro definitions for the Parallel component
+
+
+#define MPI_COMM_CELLO MPI_COMM_WORLD
+
+//--------------------------------------------------
+// USING CHARM
+//--------------------------------------------------
+
+#  define PARALLEL_INIT      /* BLANK */
+#  define PARALLEL_EXIT      CkExit()
+#  define PARALLEL_RUN       "charmrun [ +p<processors> ] "
+#  define PARALLEL_PRINTF    CkPrintf
+#  define PARALLEL_ARGC      main->argc
+#  define PARALLEL_ARGV      main->argv
+
+#  define PARALLEL_MAIN_BEGIN			\
+  Main::Main(CkArgMsg* main) 			\
+    : count_exit_(0),				\
+      count_checkpoint_(0),                     \
+      monitor_(NULL), 				\
+      fp_text_(),                               \
+      sync_text_()
+
+#  define PARALLEL_MAIN_END 
+
+#  define PARALLEL_CLASS_DECL(CLASS) class CLASS : public CBase_##CLASS
+#  define PARALLEL_PROXY(CLASS) CProxy_##CLASS
+#  define PARALLEL_NEW_ARRAY_1D(CLASS,NX)       CProxy_##CLASS::ckNew(NX)
+#  define PARALLEL_NEW_ARRAY_2D(CLASS,NX,NY)    CProxy_##CLASS::ckNew(NX,NY)
+#  define PARALLEL_NEW_ARRAY_3D(CLASS,NX,NY,NZ) CProxy_##CLASS::ckNew(NX,NY,NZ)
+
+#endif /* PARALLEL_HPP */

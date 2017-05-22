@@ -1,0 +1,320 @@
+// See LICENSE_CELLO file for license and copyright information
+
+/// @file     control_output.cpp
+/// @author   James Bordner (jobordner@ucsd.edu)
+/// @date     2011-09-01
+/// @ingroup  Control
+/// @brief    Functions implementing CHARM++ output-related functions
+
+// #define DEBUG_OUTPUT
+
+#ifdef DEBUG_OUTPUT
+#  define TRACE_OUTPUT(M) printf ("TRACE Output %s:%d %d " M "\n", __FILE__,__LINE__,CkMyPe()); fflush(stdout);
+#else
+#  define TRACE_OUTPUT(M) /*  */
+#endif
+
+#include "simulation.hpp"
+#include "mesh.hpp"
+#include "control.hpp"
+
+#include "charm_simulation.hpp"
+#include "charm_mesh.hpp"
+
+//----------------------------------------------------------------------
+
+void Block::output_begin_ ()
+{
+#ifdef DEBUG_OUTPUT
+  CkPrintf ("%d TRACE_OUTPUT Block::output_begin()\n",
+	    CkMyPe()); fflush(stdout);
+#endif  
+  TRACE_OUTPUT("Block::output_begin_()");
+
+  // Determine if there is any output this cycle
+
+  simulation()->set_phase(phase_output);
+
+  int cycle   = simulation()->cycle();
+  double time = simulation()->time();
+
+  Output * output;
+
+  int index_output = -1;
+
+  do {
+
+    output = simulation()->problem()->output(++index_output);
+
+  } while (output && ! output->is_scheduled(cycle, time));
+
+  if (output != NULL) {
+
+    // Start output if any...
+
+    simulation() -> begin_output();
+
+  } else {
+
+    // ...otherwise continue with next phase
+
+    output_exit_();
+
+  }
+}
+
+//----------------------------------------------------------------------
+
+void Simulation::begin_output ()
+{
+
+#ifdef DEBUG_OUTPUT
+    CkPrintf ("%d TRACE_OUTPUT Block::begin_output()\n",
+	      CkMyPe()); fflush(stdout);
+#endif    
+  TRACE_OUTPUT("Simulation::begin_output()");
+
+  // Switching from Block to Simulation: wait for last Block
+
+  // printf ("%s:%d sync_output_begin_.value() = %d/%d\n",
+  // 	  __FILE__,__LINE__,sync_output_begin_.value(),sync_output_begin_.stop());
+#ifdef DEBUG_OUTPUT
+  CkPrintf ("%d DEBUG_SYNC begin_output sync_output_begin_ %d/%d\n",
+	    CkMyPe(),sync_output_begin_.value(),sync_output_begin_.stop());
+#endif  
+  fflush(stdout);
+  if (sync_output_begin_.next()) {
+
+    // Barrier
+
+#ifdef DEBUG_OUTPUT
+    CkPrintf ("%d TRACE_OUTPUT Block::begin_output()\n",
+	      CkMyPe()); fflush(stdout);
+#endif    
+    TRACE_OUTPUT("Block::output_begin() calling Simulation::r_output()");
+    // --------------------------------------------------
+    //    CkCallback callback (CkIndex_Simulation::r_output(NULL), thisProxy);
+    //    contribute(0,0,CkReduction::concat,callback);
+    Simulation * simulation = proxy_simulation.ckLocalBranch();
+    simulation->r_output(NULL);
+    // --------------------------------------------------
+  }
+}
+
+//----------------------------------------------------------------------
+
+void Simulation::r_output(CkReductionMsg * msg)
+{
+#ifdef DEBUG_OUTPUT
+    CkPrintf ("%d TRACE_OUTPUT Block::r_output()\n",
+	      CkMyPe()); fflush(stdout);
+#endif    
+  performance_->start_region(perf_output);
+  TRACE_OUTPUT("Simulation::r_output()");
+
+  delete msg;
+
+  // start first output
+
+  problem()->output_reset();
+  problem()->output_next(this);
+  performance_->stop_region(perf_output);
+}
+
+//----------------------------------------------------------------------
+
+void Problem::output_next(Simulation * simulation) throw()
+{
+
+  TRACE_OUTPUT("Problem::output_next()");
+
+  simulation->set_phase(phase_output);
+
+  int cycle   = simulation->cycle();
+  double time = simulation->time();
+
+  Output * output;
+
+  // Find next schedule output
+
+  do {
+
+    output = this->output(++index_output_);
+
+  } while (output && ! output->is_scheduled(cycle, time));
+
+  if (output != NULL) {
+
+    // Perform output if any...
+
+    output->init();
+    output->open();
+    output->write_simulation(simulation);
+    output->next();
+
+  } else {
+
+    // ...otherwise exit output phase
+
+    simulation->output_exit();
+
+  }
+}
+
+//----------------------------------------------------------------------
+
+void Block::p_output_write (int index_output)
+{
+#ifdef DEBUG_OUTPUT
+    CkPrintf ("%d TRACE_OUTPUT Block::p_output_write()\n",
+	      CkMyPe()); fflush(stdout);
+#endif    
+  performance_start_ (perf_output);
+  
+  TRACE_OUTPUT("Block::p_output_write()");
+
+  FieldDescr * field_descr = simulation()->field_descr();
+  ParticleDescr * particle_descr = simulation()->particle_descr();
+  Output * output = simulation()->problem()->output(index_output);
+
+  output->write_block(this,field_descr,particle_descr);
+
+  simulation()->write_();
+  performance_stop_ (perf_output);
+}
+
+//----------------------------------------------------------------------
+
+void Simulation::write_()
+{
+  TRACE_OUTPUT("Simulation::write_()");
+  if (sync_output_write_.next()) {
+
+    // --------------------------------------------------
+    //    CkCallback callback (CkIndex_Simulation::r_write(NULL), thisProxy);
+    //    contribute(0,0,CkReduction::concat,callback);
+    r_write(NULL);
+    // --------------------------------------------------
+
+  }
+}
+
+//----------------------------------------------------------------------
+
+void Simulation::r_write(CkReductionMsg * msg)
+{
+  performance_->start_region(perf_output);
+  TRACE_OUTPUT("Simulation::r_write()");
+  delete msg;
+
+  problem()->output_wait(this);
+  performance_->stop_region(perf_output);
+}
+
+//----------------------------------------------------------------------
+
+void Simulation::r_write_checkpoint()
+{
+  performance_->start_region(perf_output);
+  TRACE_OUTPUT("Simulation::r_write_checkpoint()");
+  problem()->output_wait(this);
+  performance_->stop_region(perf_output);
+}
+
+//----------------------------------------------------------------------
+
+void Problem::output_wait(Simulation * simulation) throw()
+{
+  TRACE_OUTPUT("Problem::output_wait()");
+  
+  Output * output = this->output(index_output_);
+
+  int ip       = CkMyPe();
+  int ip_writer = output->process_writer();
+
+  if (ip == ip_writer) {
+
+    // --------------------------------------------------
+    proxy_simulation[ip].p_output_write(0,0);
+    // --------------------------------------------------
+
+  } else {
+
+    int n=0;  char * buffer = 0;
+
+    // Copy / alias buffer array of data to send
+    output->prepare_remote(&n,&buffer);
+
+    // Remote call to receive data
+    // --------------------------------------------------
+    proxy_simulation[ip_writer].p_output_write (n, buffer);
+    // --------------------------------------------------
+
+    output->close();
+    output->cleanup_remote(&n,&buffer);
+    output->finalize();
+    output_next(simulation);
+
+  }
+
+}
+
+//----------------------------------------------------------------------
+
+void Simulation::p_output_write (int n, char * buffer)
+{
+  TRACE_OUTPUT("Simulation::p_output_write()");
+  problem()->output_write(this,n,buffer); 
+}
+
+//----------------------------------------------------------------------
+
+void Problem::output_write 
+(
+ Simulation * simulation,
+ int n, char * buffer
+) throw()
+{
+  TRACE_OUTPUT("Problem::output_write()");
+
+  Output * output = this->output(index_output_);
+
+  if (n != 0) {
+    output->update_remote(n, buffer);
+  }
+
+  // ERROR HERE ON RESTART WITH DIFFERENT +p
+  if (output->sync_write()->next()) {
+    output->close();
+    output->finalize();
+    output_next(simulation);
+  }
+
+}
+
+//----------------------------------------------------------------------
+
+void Simulation::output_exit()
+{
+  TRACE_OUTPUT("Simulation::output_exit()");
+
+  // reset debug output files to limit file size
+  debug_close();
+  debug_open();
+
+  if (CkMyPe() == 0) hierarchy()->block_array()->p_output_end();
+}
+
+//----------------------------------------------------------------------
+
+void Block::p_output_end()
+{
+  performance_start_(perf_output);
+  TRACE_OUTPUT("Block::p_output_end()");
+  output_exit_();
+  performance_stop_(perf_output);
+  // control_sync(CkIndex_Block::r_stopping_enter(NULL),sync_barrier);
+}
+//======================================================================
+
+

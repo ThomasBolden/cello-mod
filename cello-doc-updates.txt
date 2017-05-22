@@ -1,0 +1,11 @@
+cello-doc updates
+-----------------
+
+:: getting_started.html
+	- requires charm version >= 6.7.0
+
+:: making cello on blue waters requires hdf5-cray/1.8.16
+
+:: new user guide
+	- what is forest of octrees?
+	- understanding the block bit-encodings
